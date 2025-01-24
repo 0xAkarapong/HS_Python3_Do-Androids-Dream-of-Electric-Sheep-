@@ -9,13 +9,15 @@ model = "mistral-small-2409"
 
 client = Mistral(api_key=api_key)
 
-chat_response = client.chat.complete(
-    model= model,
-    messages = [
-        {
-            "role": "user",
-            "content": "What is the best French cheese?",
-        },
-    ]
-)
-print(chat_response.choices[0].message.content)
+while True:
+    input_message = input("Enter your query: ")
+    chat_response = client.chat.complete(
+        model= model,
+        messages = [
+            {
+                "role": "user",
+                "content": f"{input_message}",
+            },
+        ]
+    )
+    print(chat_response.choices[0].message.content)
