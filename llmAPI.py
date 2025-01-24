@@ -9,7 +9,7 @@ model = "mistral-large-latest"
 
 client = Mistral(api_key=api_key)
 
-def get_llm_response(user_message: str) -> str:
+def get_llm_response_v1(user_message: str) -> str:
     instruction = f"""You are a helpful assistant that extracts function and interval for graph plotting.
     You can plot:
     - Polynomials of power 1 to 4 (e.g., "x^3 - 2x + 1").
@@ -72,4 +72,8 @@ def get_llm_response(user_message: str) -> str:
     )
     return chat_response.choices[0].message.content
 
-print(get_llm_response("Hi! I need a plot of sine function on interval from -5 to 5"))
+if __name__ == "__main__":
+    while True:
+        user_input = input("What graph do you want to plot? (or say 'bye' to exit): ")
+        llm_response = get_llm_response_v1(user_input)
+        print(llm_response)
