@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 api_key = os.environ["MISTRAL_API_KEY"]
-model = "mistral-embed"
+model = "mistral-large-latest"
 
 client = Mistral(api_key=api_key)
 
@@ -66,8 +66,10 @@ def get_llm_response(user_message: str) -> str:
         messages=[
             {
                 "role": "user",
-                "content": instruction,
+                "content": f"{instruction}",
             },
         ]
     )
     return chat_response.choices[0].message.content
+
+print(get_llm_response("Hi! I need a plot of sine function on interval from -5 to 5"))
