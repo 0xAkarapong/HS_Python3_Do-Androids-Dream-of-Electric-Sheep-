@@ -3,6 +3,7 @@ from mistralai import Mistral
 from dotenv import load_dotenv
 import matplotlib.pyplot as plt
 import numpy as np
+import re
 
 load_dotenv()
 
@@ -160,50 +161,60 @@ def get_llm_response_v2(user_message:str) -> str:
         print(f"Error communicating with Mistral LLM: {e}")
         return "error"
 
-def parse_llm_response_v2(llm_response: str) -> tuple[str, str | None, float | None, float | None]:
+def parse_llm_response_v2(llm_response: str) -> tuple[str, str | None, str | None, float | None, float | None]:
     if llm_response == "exit":
-        return "exit", None, None, None
+        return "exit", None, None, None, None
     if llm_response == "unknown" or llm_response == "error":
-        return "unknown", None, None, None
+        return "unknown", None, None, None, None
 
     try:
-        parts = llm_response.split(',')
-        function_name = parts[0].strip()
-        x_min = float(parts[1])
-        x_max = float(parts[2])
-        return "plot", function_name, x_min, x_max
-    except Exception:
-        return "unknown", None, None, None
+        parts = llm_response.split(',', 3)
+        function_type = parts[0].strip()
+        function_params_str = parts[1].strip()
+        interval_part = parts[2]
+
+        interval_match = re.search(r"([-+]?\d*\.?\d+),([-+]?\d*\.?\d+)",
+                                   interval_part)
+        if interval_match:
+            x_min = float(interval_match.group(1))
+            x_max = float(interval_match.group(2))
+        else:
+            print("Warning: Could not parse interval correctly from LLM response.")
+            return "unknown", None, None, None, None
+
+        if function_type == 'polynomial':
+            function_params = []
+            try:
+                coeff_str_list = function_params_str.strip('[]').split(',')
+                function_params = [float(coeff.strip()) for coeff in coeff_str_list]
+            except:
+                print("Warning: Could not parse polynomial coefficients correctly.")
+                return "unknown", None, None, None, None
+        elif function_type in ['sin', 'cos']:
+            try:
+                function_params = float(function_params_str)  # k value
+            except:
+                print("Warning: Could not parse scale factor correctly.")
+                return "unknown", None, None, None, None
+        else:
+            print("Warning: Unknown function type from LLM.")
+            return "unknown", None, None, None, None
+
+        return "plot", function_type, function_params, x_min, x_max
+
+    except Exception as e:
+        print(f"Parsing error: {e}")
+        return "unknown", None, None, None, None
+
 
 def plot_graph_v2(function_type: str, function_parameters: str, x_min: float, x_max: float) -> bool:
-    # Copy from v1
-    x = np.linspace(x_min, x_max, 400)
-    if function_name == 'x':
-        y = x
-    elif function_name == 'x^2':
-        y = x ** 2
-    elif function_name == 'sin(x)':
-        y = np.sin(x)
-    elif function_name == 'cos(x)':
-        y = np.cos(x)
-    else:
-        print(f"Error: Unknown function '{function_name}' (internal error).")
-        return False
-    plt.figure(figsize=(8, 6))
-    plt.plot(x, y)
-    plt.title(f'Plot of y={function_name} from {x_min} to {x_max}')
-    plt.xlabel('x')
-    plt.ylabel('y')
-    plt.grid(True)
-    plt.show()
-    return True
-
+    pass
 if __name__ == "__main__":
     while True:
         user_input = input("What graph do you want to plot? (or say 'bye' to exit): ")
         llm_response = get_llm_response_v2(user_input)
         print(f"LLM response: {llm_response}")
-        action, function_name, x_min, x_max = parse_llm_response_v2(llm_response)
+        action, function_type, function_params, x_min, x_max = parse_llm_response_v2(llm_response)
 
         if action == "exit":
             print("Thank you, goodbye!")
