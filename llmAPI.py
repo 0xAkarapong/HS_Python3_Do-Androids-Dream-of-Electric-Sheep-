@@ -160,21 +160,50 @@ def get_llm_response_v2(user_message:str) -> str:
         print(f"Error communicating with Mistral LLM: {e}")
         return "error"
 
-def parse_llm_response_v2():
-    pass
+def parse_llm_response_v2(llm_response: str) -> tuple[str, str | None, float | None, float | None]:
+    if llm_response == "exit":
+        return "exit", None, None, None
+    if llm_response == "unknown" or llm_response == "error":
+        return "unknown", None, None, None
 
-def plot_graph_v2():
-    pass
+    try:
+        parts = llm_response.split(',')
+        function_name = parts[0].strip()
+        x_min = float(parts[1])
+        x_max = float(parts[2])
+        return "plot", function_name, x_min, x_max
+    except Exception:
+        return "unknown", None, None, None
+
+def plot_graph_v2(function_type: str, function_parameters: str, x_min: float, x_max: float) -> bool:
+    # Copy from v1
+    x = np.linspace(x_min, x_max, 400)
+    if function_name == 'x':
+        y = x
+    elif function_name == 'x^2':
+        y = x ** 2
+    elif function_name == 'sin(x)':
+        y = np.sin(x)
+    elif function_name == 'cos(x)':
+        y = np.cos(x)
+    else:
+        print(f"Error: Unknown function '{function_name}' (internal error).")
+        return False
+    plt.figure(figsize=(8, 6))
+    plt.plot(x, y)
+    plt.title(f'Plot of y={function_name} from {x_min} to {x_max}')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.grid(True)
+    plt.show()
+    return True
 
 if __name__ == "__main__":
-    allowed_functions_v1 = ["y=x", "y=x^2", "y=sin(x)", "y=cos(x)"]
-    allowed_functions_str_v1 = ", ".join(allowed_functions_v1)
-
     while True:
         user_input = input("What graph do you want to plot? (or say 'bye' to exit): ")
-        llm_response = get_llm_response_v1(user_input, allowed_functions_str_v1)
+        llm_response = get_llm_response_v2(user_input)
         print(f"LLM response: {llm_response}")
-        action, function_name, x_min, x_max = parse_llm_response_v1(llm_response)
+        action, function_name, x_min, x_max = parse_llm_response_v2(llm_response)
 
         if action == "exit":
             print("Thank you, goodbye!")
