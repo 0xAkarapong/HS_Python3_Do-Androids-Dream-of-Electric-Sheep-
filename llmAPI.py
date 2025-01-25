@@ -1,4 +1,6 @@
 import os
+from typing import Any
+
 from mistralai import Mistral
 from dotenv import load_dotenv
 import matplotlib.pyplot as plt
@@ -161,7 +163,7 @@ def get_llm_response_v2(user_message:str) -> str:
         print(f"Error communicating with Mistral LLM: {e}")
         return "error"
 
-def parse_llm_response_v2(llm_response: str) -> tuple[str, str | None, str | None, float | None, float | None]:
+def parse_llm_response_v2(llm_response: str) -> tuple[str, str | None, Any | None, float | None, float | None]:
     if llm_response == "exit":
         return "exit", None, None, None, None
     if llm_response == "unknown" or llm_response == "error":
@@ -208,7 +210,53 @@ def parse_llm_response_v2(llm_response: str) -> tuple[str, str | None, str | Non
 
 
 def plot_graph_v2(function_type: str, function_parameters: str, x_min: float, x_max: float) -> bool:
-    pass
+    x = np.linspace(x_min, x_max, 400)
+    y = np.zeros_like(x)
+    if function_type == 'polynomial':
+        coefficients = function_params
+        degree = len(coefficients) - 1
+        for i, coeff in enumerate(coefficients):
+            power = degree - i
+            y += coeff * (x ** power)
+
+        poly_str = ""
+        for i, coeff in enumerate(coefficients):
+            power = degree - i
+            if coeff != 0:
+                sign = "+" if coeff > 0 and i > 0 else ""
+                if power > 1:
+                    poly_str += f"{sign}{coeff}x^{power}"
+                elif power == 1:
+                    poly_str += f"{sign}{coeff}x"
+                else:
+                    poly_str += f"{sign}{coeff}"
+        if poly_str.startswith("+"):
+            poly_str = poly_str[1:]
+
+        title_func = f"y = {poly_str}"
+
+
+    elif function_type == 'sin':
+        k = function_params
+        y = np.sin(k * x)
+        title_func = f"y = sin({k}x)"
+    elif function_type == 'cos':
+        k = function_params
+        y = np.cos(k * x)
+        title_func = f"y = cos({k}x)"
+    else:
+        print(f"Error: Unknown function type '{function_type}' (internal error).")
+        return False
+
+    plt.figure(figsize=(8, 6))
+    plt.plot(x, y)
+    plt.title(f'Plot of {title_func} from {x_min} to {x_max}')
+    plt.xlabel('x')
+    plt.ylabel('y')
+    plt.grid(True)
+    plt.show()
+    return True
+
 if __name__ == "__main__":
     while True:
         user_input = input("What graph do you want to plot? (or say 'bye' to exit): ")
@@ -220,12 +268,12 @@ if __name__ == "__main__":
             print("Thank you, goodbye!")
             break
         elif action == "plot":
-            if plot_graph_v1(function_name, x_min, x_max):
+            if plot_graph_v2(function_type, x_min, x_max):
                 print("Graph plotted successfully.")
             else:
                 print("Sorry, there was an error plotting the graph.")
         elif action == "unknown":
             print(
-                "Sorry, I didn't understand your request or the function is not supported. Please ask again using supported functions: " + allowed_functions_str_v1)
+                "Sorry, I didn't understand your request. Please ask again using polynomials (up to power 4), sin(kx), or cos(kx).")
         elif action == "error":
             print("Sorry, there was an error communicating with the LLM. Please try again later.")
