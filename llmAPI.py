@@ -115,10 +115,10 @@ def get_llm_response_v2(user_message:str) -> str:
     - x_min (numeric value from the interval)
     - x_max (numeric value from the interval)
 
-    Return the result in the format: "function_type,function_parameters,x_min,x_max"
-
-    For polynomials, function_parameters should be a comma-separated list of coefficients.
-    For sin(kx) and cos(kx), function_parameters should be just the value of k.
+    **IMPORTANT INSTRUCTIONS: Return ONLY the result in the format: "function_type,function_parameters,x_min,x_max".**
+    **For polynomials, function_parameters should be a comma-separated list of coefficients INSIDE SQUARE BRACKETS (e.g., [1,-2,1]).**
+    **For sin(kx) and cos(kx), function_parameters should be just the value of k (a single number).**
+    **Do not include any extra text, explanations, or preambles. Just the comma-separated output.**
 
     If the user wants to end the session, return "exit".
     If you cannot understand the request, return "unknown".
@@ -137,7 +137,7 @@ def get_llm_response_v2(user_message:str) -> str:
 
     Example 4:
     User: Plot x^4 + 1
-    Assistant: polynomial,[1,0,0,0,1],-10,10 (Default interval if not specified)
+    Assistant: polynomial,[1,0,0,0,1],-10,10
 
     Example 5:
     User: bye bye
@@ -163,44 +163,80 @@ def get_llm_response_v2(user_message:str) -> str:
         print(f"Error communicating with Mistral LLM: {e}")
         return "error"
 
-def parse_llm_response_v2(llm_response: str) -> tuple[str, str | None, Any | None, float | None, float | None]:
+def parse_llm_response_v2(llm_response):
+    # I'm very confused right now
     if llm_response == "exit":
         return "exit", None, None, None, None
     if llm_response == "unknown" or llm_response == "error":
         return "unknown", None, None, None, None
 
     try:
-        parts = llm_response.split(',', 3)
-        function_type = parts[0].strip()
-        function_params_str = parts[1].strip()
-        interval_part = parts[2]
-
-        interval_match = re.search(r"([-+]?\d*\.?\d+),([-+]?\d*\.?\d+)",
-                                   interval_part)
-        if interval_match:
-            x_min = float(interval_match.group(1))
-            x_max = float(interval_match.group(2))
-        else:
-            print("Warning: Could not parse interval correctly from LLM response.")
+        parts = llm_response.split(',', 1) # Split only at the first comma
+        if len(parts) < 2:
+            print("Warning: Incomplete response format (missing comma after function type).")
             return "unknown", None, None, None, None
 
+        function_type = parts[0].strip()
+        rest_of_response = parts[1]
+
+        print(f"Debug: function_type = '{function_type}'")
+        print(f"Debug: rest_of_response = '{rest_of_response}'")
+
         if function_type == 'polynomial':
-            function_params = []
-            try:
-                coeff_str_list = function_params_str.strip('[]').split(',')
-                function_params = [float(coeff.strip()) for coeff in coeff_str_list]
-            except:
-                print("Warning: Could not parse polynomial coefficients correctly.")
+            start_bracket = rest_of_response.find('[')
+            end_bracket = rest_of_response.find(']')
+            if start_bracket != -1 and end_bracket != -1 and start_bracket < end_bracket:
+                function_params_str = rest_of_response[start_bracket+1:end_bracket].strip()
+                interval_start_index = end_bracket + 1 + 1 # +1 to skip ']' and +1 to skip next comma (if any)
+                interval_part = rest_of_response[interval_start_index:].strip() if interval_start_index < len(rest_of_response) else ""
+
+                print(f"Debug: polynomial function_params_str = '{function_params_str}'")
+                print(f"Debug: polynomial interval_part = '{interval_part}'")
+
+
+                function_params = []
+                try:
+                    coeff_str_list = function_params_str.split(',')
+                    function_params = [float(coeff.strip()) for coeff in coeff_str_list]
+                except:
+                    print("Warning: Could not parse polynomial coefficients correctly.")
+                    return "unknown", None, None, None, None
+            else:
+                print("Warning: Malformed polynomial parameters (missing brackets).")
                 return "unknown", None, None, None, None
+
         elif function_type in ['sin', 'cos']:
+            parts_after_type = rest_of_response.split(',', 1) # Split rest by comma again
+            if len(parts_after_type) < 2:
+                 print("Warning: Incomplete response format for sin/cos (missing comma after function param).")
+                 return "unknown", None, None, None, None
+
+            function_params_str = parts_after_type[0].strip()
+            interval_part = parts_after_type[1].strip()
+
+            print(f"Debug: trig function_params_str = '{function_params_str}'")
+            print(f"Debug: trig interval_part = '{interval_part}'")
+
+
             try:
-                function_params = float(function_params_str)  # k value
+                function_params = float(function_params_str) # k value
             except:
                 print("Warning: Could not parse scale factor correctly.")
                 return "unknown", None, None, None, None
         else:
-            print("Warning: Unknown function type from LLM.")
+            print("Warning: Unknown function type from LLM: " + function_type)
             return "unknown", None, None, None, None
+
+        # Parse interval part (common for all function types)
+        interval_match = re.search(r"\s*([-+]?\d*\.?\d+)\s*,\s*([-+]?\d*\.?\d+)\s*", interval_part)
+        if interval_match:
+            x_min = float(interval_match.group(1))
+            x_max = float(interval_match.group(2))
+            print(f"Debug: x_min = {x_min}, x_max = {x_max}") # Debug print for parsed x_min and x_max
+        else:
+            print("Warning: Could not parse interval correctly from LLM response.")
+            return "unknown", None, None, None, None
+
 
         return "plot", function_type, function_params, x_min, x_max
 
@@ -268,7 +304,7 @@ if __name__ == "__main__":
             print("Thank you, goodbye!")
             break
         elif action == "plot":
-            if plot_graph_v2(function_type, x_min, x_max):
+            if plot_graph_v2(function_type, function_params, x_min, x_max):
                 print("Graph plotted successfully.")
             else:
                 print("Sorry, there was an error plotting the graph.")
